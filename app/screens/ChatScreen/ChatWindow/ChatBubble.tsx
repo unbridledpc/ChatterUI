@@ -1,3 +1,4 @@
+import { setStringAsync } from 'expo-clipboard'
 import { Pressable, Text, View } from 'react-native'
 import { useMMKVBoolean } from 'react-native-mmkv'
 import { useShallow } from 'zustand/react/shallow'
@@ -5,6 +6,7 @@ import { useShallow } from 'zustand/react/shallow'
 import { AppSettings } from '@lib/constants/GlobalValues'
 import { useAppMode } from '@lib/state/AppMode'
 import { Chats } from '@lib/state/Chat'
+import { Logger } from '@lib/state/Logger'
 import { Theme } from '@lib/theme/ThemeManager'
 
 import ChatAttachments from './ChatAttachments'
@@ -43,6 +45,31 @@ const ChatBubble: React.FC<ChatTextProps> = ({
         if (!nowGenerating) showEditor(index)
     }
 
+    const handleLongPress = () => {
+        if (nowGenerating) return
+
+        // Keep the existing long-press edit behavior for the user's own prompts.
+        if (message.is_user) {
+            handleEnableEdit()
+            return
+        }
+
+        // For assistant responses, copy the entire stored swipe, not just visible text.
+        const fullResponse = message.swipes?.[message.swipe_id]?.swipe
+        if (!fullResponse) {
+            Logger.errorToast('Nothing to copy')
+            return
+        }
+
+        setStringAsync(fullResponse)
+            .then(() => {
+                Logger.infoToast('Full response copied')
+            })
+            .catch(() => {
+                Logger.errorToast('Failed to copy to clipboard')
+            })
+    }
+
     const hasSwipes = message?.swipes?.length > 1
     const showSwipe = !message.is_user && isLastMessage && (hasSwipes || !isGreeting)
     const timings = message.swipes[message.swipe_id].timings
@@ -73,7 +100,7 @@ const ChatBubble: React.FC<ChatTextProps> = ({
                         },
                     ],
                 }}
-                onLongPress={handleEnableEdit}>
+                onLongPress={handleLongPress}>
                 {isLastMessage ? (
                     <ChatTextLast nowGenerating={nowGenerating} index={index} />
                 ) : (
