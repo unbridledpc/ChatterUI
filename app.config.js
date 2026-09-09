@@ -2,13 +2,13 @@ const IS_DEV = process.env.APP_VARIANT === 'development'
 
 module.exports = {
     expo: {
-        name: IS_DEV ? 'ChatterUI (DEV)' : 'ChatterUI',
+        name: IS_DEV ? 'ChatterUI Fold (DEV)' : 'ChatterUI Fold',
         newArchEnabled: true,
-        slug: 'ChatterUI',
-        version: '0.9.0',
+        slug: 'ChatterUI-Fold',
+        version: '0.9.0-fold1',
         orientation: 'default',
         icon: './assets/images/icon.png',
-        scheme: 'chatterui',
+        scheme: 'chatteruifold',
         userInterfaceStyle: 'automatic',
         assetBundlePatterns: ['**/*'],
         ios: {
@@ -18,8 +18,8 @@ module.exports = {
                 tinted: './assets/images/icon.png',
             },
             supportsTablet: true,
-            package: IS_DEV ? 'com.Vali98.ChatterUIDev' : 'com.Vali98.ChatterUI',
-            bundleIdentifier: IS_DEV ? 'com.Vali98.ChatterUIDev' : 'com.Vali98.ChatterUI',
+            package: IS_DEV ? 'com.unbridledpc.ChatterUIFoldDev' : 'com.unbridledpc.ChatterUIFold',
+            bundleIdentifier: IS_DEV ? 'com.unbridledpc.ChatterUIFoldDev' : 'com.unbridledpc.ChatterUIFold',
         },
         android: {
             adaptiveIcon: {
@@ -29,7 +29,7 @@ module.exports = {
                 backgroundColor: '#000',
             },
             edgeToEdgeEnabled: true,
-            package: IS_DEV ? 'com.Vali98.ChatterUIDev' : 'com.Vali98.ChatterUI',
+            package: IS_DEV ? 'com.unbridledpc.ChatterUIFoldDev' : 'com.unbridledpc.ChatterUIFold',
             userInterfaceStyle: 'dark',
             permissions: [
                 'android.permission.FOREGROUND_SERVICE',
@@ -82,11 +82,11 @@ module.exports = {
                     'android:largeHeap': true,
                 },
             ],
-            ['@vali98/react-native-process-text', { label: 'Ask In ChatterUi' }],
+            ['@vali98/react-native-process-text', { label: 'Ask In ChatterUI Fold' }],
             [
                 'expo-camera',
                 {
-                    cameraPermission: 'Allow ChatterUI to access your camera',
+                    cameraPermission: 'Allow ChatterUI Fold to access your camera',
                 },
             ],
             ['expo-sqlite', { withSQLiteVecExtension: true }],
@@ -106,9 +106,6 @@ module.exports = {
         extra: {
             router: {
                 origin: false,
-            },
-            eas: {
-                projectId: 'd588a96a-5eb0-457a-85bc-e21acfdc60e9',
             },
         },
     },
