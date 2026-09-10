@@ -70,12 +70,19 @@ const ChatSwipes: React.FC<SwipesProps> = ({ nowGenerating, isGreeting, index })
                 <TouchableOpacity
                     onPress={() => swipeId && continueResponse(swipeId)}
                     disabled={nowGenerating}
-                    style={styles.swipeButton}>
+                    style={styles.continueButton}>
                     <AntDesign
                         name="forward"
-                        size={20}
+                        size={18}
                         color={nowGenerating ? color.text._600 : color.text._300}
                     />
+                    <Text
+                        style={[
+                            styles.continueText,
+                            { color: nowGenerating ? color.text._600 : color.text._300 },
+                        ]}>
+                        Continue
+                    </Text>
                 </TouchableOpacity>
             )}
 
@@ -97,7 +104,7 @@ const ChatSwipes: React.FC<SwipesProps> = ({ nowGenerating, isGreeting, index })
 export default ChatSwipes
 
 const useStyles = () => {
-    const { color, spacing } = Theme.useTheme()
+    const { color, spacing, fontSize } = Theme.useTheme()
     return StyleSheet.create({
         swipesItem: {
             flexDirection: 'row',
@@ -117,6 +124,20 @@ const useStyles = () => {
             alignItems: 'center',
             flex: 1,
             paddingVertical: spacing.sm,
+        },
+
+        continueButton: {
+            alignItems: 'center',
+            justifyContent: 'center',
+            flex: 1.4,
+            paddingVertical: spacing.sm,
+            flexDirection: 'row',
+            columnGap: 5,
+        },
+
+        continueText: {
+            fontSize: fontSize.s,
+            fontWeight: '600',
         },
     })
 }
