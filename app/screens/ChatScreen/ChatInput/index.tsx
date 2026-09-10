@@ -29,7 +29,9 @@ import { useChatInputTextStore } from '@lib/state/components/ChatInput'
 import { Logger } from '@lib/state/Logger'
 import { Theme } from '@lib/theme/ThemeManager'
 
+import ChatContextMeter from './ChatContextMeter'
 import ChatOptions from './ChatInputOptions'
+import ThinkingToggle from './ThinkingToggle'
 
 export type Attachment = {
     uri: string
@@ -212,6 +214,7 @@ const ChatInput = () => {
                 visible={showCamera}
                 setVisible={setShowCamera}
             />
+            <ChatContextMeter />
             <View
                 style={{
                     flexDirection: 'row',
@@ -258,6 +261,7 @@ const ChatInput = () => {
                                 }}
                                 placement="top"
                             />
+                            <ThinkingToggle />
                         </Animated.View>
                     )}
                     {hideOptions && (

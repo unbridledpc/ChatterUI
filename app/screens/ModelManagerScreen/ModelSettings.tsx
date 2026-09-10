@@ -1,6 +1,6 @@
 import { useFocusEffect } from 'expo-router'
 import React, { useEffect, useState } from 'react'
-import { BackHandler, Platform, View } from 'react-native'
+import { BackHandler, Platform, Text, View } from 'react-native'
 import { useMMKVBoolean, useMMKVNumber } from 'react-native-mmkv'
 import Animated, { Easing, SlideInRight, SlideOutRight } from 'react-native-reanimated'
 import { useShallow } from 'zustand/react/shallow'
@@ -12,10 +12,11 @@ import ThemedSwitch from '@components/input/ThemedSwitch'
 import SectionTitle from '@components/text/SectionTitle'
 import Alert from '@components/views/Alert'
 import { AppSettings, Global } from '@lib/constants/GlobalValues'
-import { Llama } from '@lib/engine/Local/LlamaLocal'
+import { kvCacheTypes, Llama } from '@lib/engine/Local/LlamaLocal'
 import { KV } from '@lib/engine/Local/Model'
 import useBackendDevices from '@lib/hooks/BackendDevices'
 import { Logger } from '@lib/state/Logger'
+import { Theme } from '@lib/theme/ThemeManager'
 import { readableFileSize } from '@lib/utils/File'
 
 type ModelSettingsProp = {
@@ -35,6 +36,7 @@ const ModelSettings: React.FC<ModelSettingsProp> = ({ modelImporting, modelLoadi
     )
 
     const devices = useBackendDevices()
+    const { color, spacing, fontSize } = Theme.useTheme()
 
     const [saveKV, setSaveKV] = useMMKVBoolean(AppSettings.SaveLocalKV)
     const [autoloadLocal, setAutoloadLocal] = useMMKVBoolean(AppSettings.AutoLoadLocal)
@@ -96,7 +98,7 @@ const ModelSettings: React.FC<ModelSettingsProp> = ({ modelImporting, modelLoadi
                         value={config.context_length}
                         onValueChange={(value) => setConfig({ ...config, context_length: value })}
                         min={1024}
-                        max={32768}
+                        max={65536}
                         step={1024}
                         disabled={modelImporting || modelLoading}
                     />
@@ -156,6 +158,52 @@ const ModelSettings: React.FC<ModelSettingsProp> = ({ modelImporting, modelLoadi
                             }}
                         />
                     )}
+
+                    <SectionTitle>Memory Settings</SectionTitle>
+                    <View style={{ marginTop: spacing.xl, rowGap: spacing.l }}>
+                        <HorizontalSelector
+                            style={{ flex: 0 }}
+                            label="Flash Attention"
+                            description="Reduces memory use at long context. Required for a quantized V cache."
+                            values={[
+                                { label: 'Auto', value: 'auto' as const },
+                                { label: 'On', value: 'on' as const },
+                                { label: 'Off', value: 'off' as const },
+                            ]}
+                            selected={config.flash_attn ?? 'auto'}
+                            onPress={(value) => setConfig({ ...config, flash_attn: value })}
+                        />
+                        <HorizontalSelector
+                            style={{ flex: 0 }}
+                            label="K Cache Type"
+                            description="q8_0 roughly halves KV cache memory with negligible quality loss, leaving room for larger models or longer context."
+                            values={kvCacheTypes}
+                            selected={config.cache_type_k ?? 'f16'}
+                            onPress={(value) => setConfig({ ...config, cache_type_k: value })}
+                        />
+                        <HorizontalSelector
+                            style={{ flex: 0 }}
+                            label="V Cache Type"
+                            description={
+                                (config.cache_type_v ?? 'f16') !== 'f16' &&
+                                (config.flash_attn ?? 'auto') === 'off'
+                                    ? 'A quantized V cache needs flash attention. It will be turned on when the model loads.'
+                                    : 'q4_0 saves the most memory but can hurt quality. q8_0 is the safe choice.'
+                            }
+                            values={kvCacheTypes}
+                            selected={config.cache_type_v ?? 'f16'}
+                            onPress={(value) => setConfig({ ...config, cache_type_v: value })}
+                        />
+                        <ThemedSwitch
+                            label="Lock Model In Memory"
+                            description="Pins the model in RAM for steadier speed. Turn off for models close to your device's memory limit, otherwise Android may kill the app."
+                            value={config.use_mlock ?? true}
+                            onChangeValue={(value) => setConfig({ ...config, use_mlock: value })}
+                        />
+                        <Text style={{ color: color.text._500, fontSize: fontSize.s }}>
+                            Memory settings take effect the next time a model is loaded.
+                        </Text>
+                    </View>
                 </>
             )}
             <SectionTitle>Advanced Settings</SectionTitle>

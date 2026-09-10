@@ -60,6 +60,15 @@ export type LlamaState = {
     tokenize: (text: string, media_paths?: string[]) => Promise<{ tokens: number[] } | undefined>
 }
 
+export type FlashAttentionMode = 'auto' | 'on' | 'off'
+export type KVCacheType = 'f16' | 'q8_0' | 'q4_0'
+
+export const kvCacheTypes: { label: string; value: KVCacheType }[] = [
+    { label: 'f16', value: 'f16' },
+    { label: 'q8_0', value: 'q8_0' },
+    { label: 'q4_0', value: 'q4_0' },
+]
+
 export type LlamaConfig = {
     context_length: number
     threads: number
@@ -67,6 +76,13 @@ export type LlamaConfig = {
     batch: number
     ctx_shift: boolean
     devices: string[]
+    /** Flash attention: lowers memory use at long context, required for a quantized V cache */
+    flash_attn: FlashAttentionMode
+    /** KV cache precision. q8_0 roughly halves KV memory with negligible quality loss */
+    cache_type_k: KVCacheType
+    cache_type_v: KVCacheType
+    /** Pin model weights in RAM. Faster steady state, but large models may be killed by the OS */
+    use_mlock: boolean
 }
 
 export type EngineDataProps = {
@@ -81,13 +97,30 @@ export type EngineDataProps = {
 
 const sessionFile = `${AppDirectory.SessionPath}llama-session.bin`
 
-const defaultConfig = {
-    context_length: 4096,
+const defaultConfig: LlamaConfig = {
+    context_length: 8192,
     threads: 4,
     gpu_layers: 0,
     batch: 512,
     ctx_shift: true,
     devices: [],
+    flash_attn: 'auto',
+    cache_type_k: 'q8_0',
+    cache_type_v: 'q8_0',
+    use_mlock: true,
+}
+
+/**
+ * Reads the model's trained context length from GGUF metadata (e.g. "qwen3.context_length").
+ * Returns undefined when the metadata does not carry it.
+ */
+const getTrainedContextLength = (metadata: object | undefined): number | undefined => {
+    if (!metadata) return
+    for (const [key, value] of Object.entries(metadata)) {
+        if (!key.endsWith('.context_length')) continue
+        const parsed = typeof value === 'number' ? value : parseInt(String(value))
+        if (Number.isFinite(parsed) && parsed > 0) return parsed
+    }
 }
 
 export namespace Llama {
@@ -121,16 +154,29 @@ export namespace Llama {
                     lastMmproj: state.lastMmproj,
                 }),
                 storage: createMMKVStorage(),
-                version: 3,
+                version: 4,
                 migrate: (persistedState: any, version) => {
-                    if (version === 1) {
+                    // Each step fills in the fields introduced by the next version.
+                    // The migrated state must be returned or zustand drops the stored config.
+                    if (version < 2) {
                         persistedState.config.ctx_shift = true
                         Logger.info('Migrated to v2 EngineData')
                     }
-                    if (version === 2) {
+                    if (version < 3) {
                         persistedState.config.devices = []
                         Logger.info('Migrated to v3 EngineData')
                     }
+                    if (version < 4) {
+                        persistedState.config = {
+                            ...persistedState.config,
+                            flash_attn: defaultConfig.flash_attn,
+                            cache_type_k: defaultConfig.cache_type_k,
+                            cache_type_v: defaultConfig.cache_type_v,
+                            use_mlock: defaultConfig.use_mlock,
+                        }
+                        Logger.info('Migrated to v4 EngineData')
+                    }
+                    return persistedState
                 },
             }
         )
@@ -167,6 +213,15 @@ export namespace Llama {
                 model_path = (await getContentFd(model_path)) ?? model_path
             }
 
+            // llama.cpp refuses to quantize the V cache without flash attention,
+            // so force it on rather than fail the load.
+            let flashAttention = config.flash_attn ?? 'auto'
+            const cacheTypeV = config.cache_type_v ?? 'f16'
+            if (cacheTypeV !== 'f16' && flashAttention !== 'on') {
+                Logger.warn('Quantized V cache requires flash attention, enabling it')
+                flashAttention = 'on'
+            }
+
             const params: ContextParams = {
                 model: model_path,
                 n_ctx: config.context_length,
@@ -174,13 +229,16 @@ export namespace Llama {
                 n_batch: config.batch,
                 ctx_shift: config.ctx_shift,
                 n_gpu_layers: config.gpu_layers,
-                use_mlock: true,
+                use_mlock: config.use_mlock ?? true,
                 use_mmap: true,
                 devices: config.devices,
+                flash_attn_type: flashAttention,
+                cache_type_k: config.cache_type_k ?? 'f16',
+                cache_type_v: cacheTypeV,
             }
 
             Logger.info(
-                `\n------ MODEL LOAD -----\n Model Name: ${model.name}\nStarting with parameters: \nContext Length: ${params.n_ctx}\nThreads: ${params.n_threads}\nBatch Size: ${params.n_batch}\nGPU Layers: ${params.n_gpu_layers}`
+                `\n------ MODEL LOAD -----\n Model Name: ${model.name}\nStarting with parameters: \nContext Length: ${params.n_ctx}\nThreads: ${params.n_threads}\nBatch Size: ${params.n_batch}\nGPU Layers: ${params.n_gpu_layers}\nFlash Attention: ${params.flash_attn_type}\nKV Cache: K=${params.cache_type_k} V=${params.cache_type_v}\nLock In Memory: ${params.use_mlock}`
             )
 
             const progressCallback = (progress: number) => {
@@ -195,6 +253,17 @@ export namespace Llama {
             })
 
             if (!llamaContext) return
+
+            // Running past the trained context degrades output quality, so say so up front
+            const trainedContext = getTrainedContextLength(llamaContext.model?.metadata)
+            if (trainedContext) {
+                Logger.info(`Model trained context length: ${trainedContext}`)
+                if (config.context_length > trainedContext) {
+                    Logger.warnToast(
+                        `Max Context (${config.context_length}) exceeds this model's trained length (${trainedContext}). Quality may degrade.`
+                    )
+                }
+            }
 
             set({
                 context: llamaContext,

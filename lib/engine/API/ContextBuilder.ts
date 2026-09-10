@@ -2,6 +2,7 @@ import { AppSettings } from '@lib/constants/GlobalValues'
 import { buildThinkRules } from '@lib/markdown/ThinkTags'
 import { CharacterCardData, CharacterTokenCache } from '@lib/state/Characters'
 import { ChatEntry } from '@lib/state/Chat'
+import { useContextUsageStore } from '@lib/state/ContextUsage'
 import { defaultSystemPromptFormat, InstructTokenCache, InstructType } from '@lib/state/Instructs'
 import { Logger } from '@lib/state/Logger'
 import { replaceMacros } from '@lib/state/Macros'
@@ -200,6 +201,12 @@ export const buildChatCompletionContext = async ({
         })
 
     const output = [...payload, ...messageBuffer.reverse()]
+    useContextUsageStore.getState().record({
+        used: total_length,
+        limit: maxLength,
+        dropped: Math.max(0, index + 1),
+        total: messages.length,
+    })
     Logger.info(`Approximate Context Size: ${total_length} tokens`)
     Logger.info(`${(performance.now() - delta).toFixed(2)}ms taken to build context`)
     if (mmkv.getBoolean(AppSettings.PrintContext)) Logger.info(JSON.stringify(output))
@@ -336,6 +343,12 @@ export const buildTextCompletionContext = async ({
     payload += instruct.system_suffix
     payload = replaceMacrosInternal(payload + message_acc, instruct)
 
+    useContextUsageStore.getState().record({
+        used: message_acc_length + payloadLength,
+        limit: maxLength,
+        dropped: Math.max(0, index + 1),
+        total: messages.length,
+    })
     Logger.info(`Approximate Context Size: ${message_acc_length + payloadLength} tokens`)
     Logger.info(`${(performance.now() - delta).toFixed(2)}ms taken to build context`)
 
