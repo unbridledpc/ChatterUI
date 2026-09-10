@@ -29,12 +29,23 @@ export type SamplerStateProps = {
     fixConfigs: () => void
 }
 
+const foldDefaultSamplerConfig: SamplerConfigData = {
+    ...defaultSamplerConfig,
+    [SamplerID.CONTEXT_LENGTH]: 8192,
+    [SamplerID.GENERATED_LENGTH]: 4096,
+    [SamplerID.TEMPERATURE]: 0.7,
+    [SamplerID.TOP_P]: 0.8,
+    [SamplerID.TOP_K]: 20,
+    [SamplerID.MIN_P]: 0,
+    [SamplerID.ENABLE_THINKING]: false,
+}
+
 export namespace SamplersManager {
     export const useSamplerStore = create<SamplerStateProps>()(
         persist(
             (set, get) => ({
                 currentConfigIndex: 0,
-                configList: [{ name: 'Default', data: defaultSamplerConfig }],
+                configList: [{ name: 'Fold Coding', data: foldDefaultSamplerConfig }],
                 addSamplerConfig: (config) => {
                     const configs = get().configList
                     if (configs.some((item) => item.name === config.name)) {

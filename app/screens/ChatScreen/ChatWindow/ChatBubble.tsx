@@ -7,6 +7,7 @@ import { AppSettings } from '@lib/constants/GlobalValues'
 import { useAppMode } from '@lib/state/AppMode'
 import { Chats } from '@lib/state/Chat'
 import { Logger } from '@lib/state/Logger'
+import { SamplersManager } from '@lib/state/SamplerState'
 import { Theme } from '@lib/theme/ThemeManager'
 
 import ChatAttachments from './ChatAttachments'
@@ -73,6 +74,14 @@ const ChatBubble: React.FC<ChatTextProps> = ({
     const hasSwipes = message?.swipes?.length > 1
     const showSwipe = !message.is_user && isLastMessage && (hasSwipes || !isGreeting)
     const timings = message.swipes[message.swipe_id].timings
+    const sampler = SamplersManager.getCurrentSampler()
+    const requestedTokens = Number(sampler.genamt ?? 0)
+    const contextLength = Number(sampler.max_length ?? 0)
+    const generatedTokens = Number(timings?.predicted_n ?? 0)
+    const promptTokens = Number((timings as any)?.prompt_n ?? 0)
+    const hitTokenLimit =
+        !nowGenerating && requestedTokens > 0 && generatedTokens >= Math.max(requestedTokens - 1, 1)
+    const stopLabel = hitTokenLimit ? 'TOKEN LIMIT' : 'EOS/STOP'
 
     return (
         <View>
@@ -112,16 +121,31 @@ const ChatBubble: React.FC<ChatTextProps> = ({
                         flexDirection: 'row',
                     }}>
                     {showTPS && appMode === 'local' && timings && (
-                        <Text
-                            style={{
-                                color: color.text._500,
-                                fontWeight: '300',
-                                textAlign: 'right',
-                                fontSize: fontSize.s,
-                            }}>
-                            {`Prompt: ${getFiniteValue(timings.prompt_per_second)} t/s`}
-                            {`   Text Gen: ${getFiniteValue(timings.predicted_per_second)} t/s`}
-                        </Text>
+                        <View style={{ flex: 1 }}>
+                            <Text
+                                style={{
+                                    color: color.text._500,
+                                    fontWeight: '300',
+                                    fontSize: fontSize.s,
+                                }}>
+                                {`Prompt: ${getFiniteValue(timings.prompt_per_second)} t/s`}
+                                {`   Text Gen: ${getFiniteValue(timings.predicted_per_second)} t/s`}
+                            </Text>
+                            {!message.is_user && !nowGenerating && (
+                                <Text
+                                    style={{
+                                        color: hitTokenLimit ? color.error._400 : color.text._500,
+                                        fontWeight: hitTokenLimit ? '600' : '300',
+                                        fontSize: fontSize.s,
+                                    }}>
+                                    {`Generated: ${generatedTokens} / ${requestedTokens}`}
+                                    {`   Stop: ${stopLabel}`}
+                                    {contextLength > 0
+                                        ? `   Context: ${promptTokens > 0 ? `${promptTokens} / ` : ''}${contextLength}`
+                                        : ''}
+                                </Text>
+                            )}
+                        </View>
                     )}
 
                     <ChatQuickActions
