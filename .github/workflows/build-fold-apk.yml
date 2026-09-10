@@ -6,6 +6,10 @@ on:
     branches:
       - fold-custom-v1
 
+concurrency:
+  group: chatterui-fold-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   android-release-apk:
     runs-on: ubuntu-latest
