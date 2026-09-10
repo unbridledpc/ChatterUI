@@ -4,6 +4,7 @@ import { useMMKVBoolean } from 'react-native-mmkv'
 import SupportButton from '@components/buttons/SupportButton'
 import Drawer from '@components/views/Drawer'
 import { AppSettings } from '@lib/constants/GlobalValues'
+import { Layout } from '@lib/constants/Layout'
 import { Theme } from '@lib/theme/ThemeManager'
 import appConfig from 'app.config'
 
@@ -20,6 +21,7 @@ const SettingsDrawer = () => {
             drawerID={Drawer.ID.SETTINGS}
             drawerStyle={{
                 width: '60%',
+                maxWidth: Layout.settingsDrawerMaxWidth,
                 paddingBottom: spacing.xl,
             }}>
             <UserInfo />

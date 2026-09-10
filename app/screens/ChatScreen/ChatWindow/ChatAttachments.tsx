@@ -1,4 +1,4 @@
-import { Dimensions, View } from 'react-native'
+import { useWindowDimensions, View } from 'react-native'
 
 import ScaledImage from '@components/views/ScaledImage'
 import { Chats } from '@lib/state/Chat'
@@ -9,6 +9,7 @@ type ChatAttachmentsProps = {
 
 const ChatAttachments: React.FC<ChatAttachmentsProps> = ({ index }) => {
     const message = Chats.useEntryData(index)
+    const { height: windowHeight } = useWindowDimensions()
 
     if (message.attachments.length < 1) return
     const images = message.attachments.filter((item) => item.type === 'image')
@@ -30,7 +31,7 @@ const ChatAttachments: React.FC<ChatAttachmentsProps> = ({ index }) => {
                             cachePolicy="none"
                             key={item.uri}
                             uri={item.uri}
-                            style={{ height: Dimensions.get('window').height / 8, borderRadius: 8 }}
+                            style={{ height: windowHeight / 8, borderRadius: 8 }}
                         />
                     ))}
                 </View>

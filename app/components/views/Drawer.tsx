@@ -19,6 +19,7 @@ import { create } from 'zustand'
 import { useShallow } from 'zustand/react/shallow'
 
 import ThemedButton, { ThemedButtonProps } from '@components/buttons/ThemedButton'
+import { Layout } from '@lib/constants/Layout'
 import { Theme } from '@lib/theme/ThemeManager'
 
 import FadeBackrop from './FadeBackdrop'
@@ -217,6 +218,7 @@ const useStyles = () => {
             backgroundColor: color.neutral._100,
             shadowColor: '#000',
             width: '80%',
+            maxWidth: Layout.userDrawerMaxWidth,
             height: '100%',
             borderTopWidth: 1,
             elevation: 20,

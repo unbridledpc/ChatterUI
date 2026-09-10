@@ -6,6 +6,7 @@ import { useMMKVBoolean } from 'react-native-mmkv'
 import ThemedSwitch from '@components/input/ThemedSwitch'
 import SectionTitle from '@components/text/SectionTitle'
 import { AppSettings } from '@lib/constants/GlobalValues'
+import { lockScreenOrientation } from '@lib/utils/Screen'
 
 const ScreenSettings = () => {
     const [unlockOrientation, setUnlockOrientation] = useMMKVBoolean(AppSettings.UnlockOrientation)
@@ -15,9 +16,12 @@ const ScreenSettings = () => {
             <SectionTitle>Screen</SectionTitle>
             <ThemedSwitch
                 label="Unlock Orientation"
-                description="Allows landscape on phones (App restart required)"
+                description="Allows landscape on phones"
                 value={unlockOrientation}
-                onChangeValue={setUnlockOrientation}
+                onChangeValue={(value) => {
+                    setUnlockOrientation(value)
+                    lockScreenOrientation()
+                }}
             />
 
             <ThemedSwitch

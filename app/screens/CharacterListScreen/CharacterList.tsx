@@ -8,6 +8,7 @@ import { useShallow } from 'zustand/react/shallow'
 import Drawer from '@components/views/Drawer'
 import HeaderButton from '@components/views/HeaderButton'
 import HeaderTitle from '@components/views/HeaderTitle'
+import { useIsWideScreen } from '@lib/hooks/WideScreen'
 import { Characters, CharInfo } from '@lib/state/Characters'
 import { CharacterSorter } from '@lib/state/CharacterSorter'
 import { TagHider } from '@lib/state/TagHider'
@@ -31,6 +32,9 @@ const CharacterList: React.FC = () => {
         }))
     )
     const hiddenTags = TagHider.useHiddenTags()
+    // Two columns on tablets, unfolded foldables and landscape; one column on phones
+    const isWide = useIsWideScreen()
+    const numColumns = isWide ? 2 : 1
     const [pages, setPages] = useState(3)
     const [previousLength, setPreviousLength] = useState(0)
     const { data, updatedAt } = useLiveQuery(
@@ -75,6 +79,10 @@ const CharacterList: React.FC = () => {
             <CharacterListHeader resultLength={characterList.length} />
             <View style={{ flex: 1 }}>
                 <Animated.FlatList
+                    // FlatList cannot change numColumns in place, remount when the layout changes
+                    key={numColumns}
+                    numColumns={numColumns}
+                    columnWrapperStyle={numColumns > 1 ? { columnGap: 16 } : undefined}
                     layout={LinearTransition}
                     itemLayoutAnimation={LinearTransition}
                     showsVerticalScrollIndicator={false}
@@ -82,11 +90,13 @@ const CharacterList: React.FC = () => {
                     data={characterList}
                     keyExtractor={(item) => item.id.toString()}
                     renderItem={({ item }) => (
-                        <CharacterListing
-                            character={item}
-                            nowLoading={nowLoading}
-                            setNowLoading={setNowLoading}
-                        />
+                        <View style={{ flex: 1, maxWidth: isWide ? '50%' : '100%' }}>
+                            <CharacterListing
+                                character={item}
+                                nowLoading={nowLoading}
+                                setNowLoading={setNowLoading}
+                            />
+                        </View>
                     )}
                     onEndReachedThreshold={1}
                     onEndReached={() => {

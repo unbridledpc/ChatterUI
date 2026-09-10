@@ -3,6 +3,7 @@ import { StyleSheet, Text, View } from 'react-native'
 
 import { Chats } from '@lib/state/Chat'
 import { Theme } from '@lib/theme/ThemeManager'
+import { getFriendlyTimeStamp } from '@lib/utils/Time'
 
 import ChatEditPopup from './ChatDrawerOptions'
 
@@ -16,7 +17,6 @@ type ChatDrawerItemProps = {
 const ChatDrawerItem: React.FC<ChatDrawerItemProps> = ({ item, onLoad }) => {
     const styles = useStyles()
     const { spacing, color } = Theme.useTheme()
-    const date = new Date(item.last_modified ?? 0)
     const { chatId } = Chats.useChat()
     return (
         <ChatEditPopup item={item} onPress={() => onLoad(item.id)}>
@@ -35,10 +35,9 @@ const ChatDrawerItem: React.FC<ChatDrawerItemProps> = ({ item, onLoad }) => {
                             <Ionicons name="chatbox" size={20} color={color.text._400} />
                             <Text style={styles.smallTextChat}>{item.entryCount}</Text>
                         </View>
-                        <View style={{ flexDirection: 'row' }}>
-                            <Text style={styles.smallText}>{date.toLocaleDateString()}</Text>
-                            <Text style={styles.smallText}>{date.toLocaleTimeString()}</Text>
-                        </View>
+                        <Text style={styles.smallText}>
+                            {getFriendlyTimeStamp(item.last_modified ?? 0)}
+                        </Text>
                     </View>
                 </View>
             </View>

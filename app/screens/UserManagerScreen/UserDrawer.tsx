@@ -1,6 +1,7 @@
 import { StyleSheet } from 'react-native'
 
 import Drawer from '@components/views/Drawer'
+import { Layout } from '@lib/constants/Layout'
 
 import UserList from './UserList'
 
@@ -17,7 +18,8 @@ export default UserDrawer
 const styles = StyleSheet.create({
     drawer: {
         width: '80%',
-        left: '20%',
+        maxWidth: Layout.userDrawerMaxWidth,
+        right: 0,
         borderTopWidth: 3,
         elevation: 20,
         position: 'absolute',

@@ -4,7 +4,6 @@ import { useFocusEffect } from 'expo-router'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import {
     BackHandler,
-    Dimensions,
     GestureResponderEvent,
     LayoutChangeEvent,
     LayoutRectangle,
@@ -13,6 +12,7 @@ import {
     Text,
     TextStyle,
     TouchableOpacity,
+    useWindowDimensions,
     View,
     ViewProps,
 } from 'react-native'
@@ -241,7 +241,8 @@ const MenuContent = ({
     const styles = useStyles()
     const insets = useSafeAreaInsets()
 
-    const { width: screenWidth, height: screenHeight } = Dimensions.get('window')
+    // Tracks rotation and fold/unfold so an open menu is re-clamped to the new window
+    const { width: screenWidth, height: screenHeight } = useWindowDimensions()
 
     const [menuSize, setMenuSize] = useState({ width: 0, height: 0 })
 

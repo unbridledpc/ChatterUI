@@ -20,6 +20,7 @@ import CameraSheet from '@components/views/CameraSheet'
 import ContextMenu from '@components/views/ContextMenu'
 import { XAxisOnlyTransition } from '@lib/animations/transitions'
 import { AppSettings } from '@lib/constants/GlobalValues'
+import { Layout } from '@lib/constants/Layout'
 import { generateResponse } from '@lib/engine/Inference'
 import { useUnfocusTextInput } from '@lib/hooks/UnfocusTextInput'
 import { Characters } from '@lib/state/Characters'
@@ -127,6 +128,7 @@ const ChatInput = () => {
             style={{
                 position: 'absolute',
                 width: '98%',
+                maxWidth: Layout.chatMaxContentWidth,
                 alignSelf: 'center',
                 bottom: 4,
                 paddingVertical: spacing.sm,
@@ -307,6 +309,9 @@ const ChatInput = () => {
                 />
                 <Animated.View layout={XAxisOnlyTransition}>
                     <TouchableOpacity
+                        hitSlop={8}
+                        accessibilityRole="button"
+                        accessibilityLabel={nowGenerating ? 'Stop generating' : 'Send message'}
                         style={{
                             borderRadius: borderRadius.m,
                             backgroundColor: nowGenerating ? color.error._500 : color.primary._500,

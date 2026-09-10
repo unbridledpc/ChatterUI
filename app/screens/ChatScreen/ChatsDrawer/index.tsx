@@ -9,6 +9,7 @@ import ThemedButton from '@components/buttons/ThemedButton'
 import ThemedTextInput from '@components/input/ThemedTextInput'
 import Drawer from '@components/views/Drawer'
 import { YAxisOnlyTransition } from '@lib/animations/transitions'
+import { Layout } from '@lib/constants/Layout'
 import { useDebounce } from '@lib/hooks/Debounce'
 import { Characters } from '@lib/state/Characters'
 import { Chats } from '@lib/state/Chat'
@@ -153,6 +154,7 @@ const useStyles = () => {
         drawer: {
             backgroundColor: color.neutral._100,
             width: '90%',
+            maxWidth: Layout.chatsDrawerMaxWidth,
             shadowColor: color.shadow,
             borderTopWidth: 3,
             elevation: 20,

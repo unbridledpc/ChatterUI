@@ -1,19 +1,22 @@
 import { useLiveQuery } from 'drizzle-orm/expo-sqlite'
 import { ImageBackground } from 'expo-image'
-import { useEffect, useRef } from 'react'
-import { FlatList } from 'react-native'
+import { useEffect, useRef, useState } from 'react'
+import { FlatList, NativeScrollEvent, NativeSyntheticEvent } from 'react-native'
 import { useMMKVBoolean } from 'react-native-mmkv'
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated'
 import { useShallow } from 'zustand/react/shallow'
 
+import ThemedButton from '@components/buttons/ThemedButton'
 import Drawer from '@components/views/Drawer'
 import HeaderTitle from '@components/views/HeaderTitle'
 import { AppSettings } from '@lib/constants/GlobalValues'
+import { Layout } from '@lib/constants/Layout'
 import { useDebounce } from '@lib/hooks/Debounce'
 import { useAppMode } from '@lib/state/AppMode'
 import { useBackgroundStore } from '@lib/state/BackgroundImage'
 import { Characters } from '@lib/state/Characters'
 import { Chats } from '@lib/state/Chat'
+import { Theme } from '@lib/theme/ThemeManager'
 import { AppDirectory } from '@lib/utils/File'
 
 import { useInputHeightStore } from '../ChatInput'
@@ -42,6 +45,24 @@ const ChatWindow = () => {
     )
     const { cause: scrollCause, index: scrollIndex } = chat?.autoScroll ?? {}
     const flatlistRef = useRef<FlatList | null>(null)
+    const { color } = Theme.useTheme()
+
+    // "Jump to latest" appears once the user has scrolled a screen or so up the history.
+    // The chat id is stored alongside so the button resets when a different chat is loaded.
+    const [jumpState, setJumpState] = useState<{ chatId?: number; show: boolean }>({
+        show: false,
+    })
+    const showJumpToLatest = jumpState.show && jumpState.chatId === chat?.id
+
+    const handleScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+        // The list is inverted, so offset 0 is the newest message
+        const shouldShow = e.nativeEvent.contentOffset.y > JUMP_TO_LATEST_THRESHOLD
+        if (shouldShow !== showJumpToLatest) setJumpState({ chatId: chat?.id, show: shouldShow })
+    }
+
+    const scrollToLatest = () => {
+        flatlistRef.current?.scrollToOffset({ offset: 0, animated: true })
+    }
     const { showSettings, showChat } = Drawer.useDrawerStore(
         useShallow((state) => ({
             showSettings: state.values?.[Drawer.ID.SETTINGS],
@@ -123,11 +144,13 @@ const ChatWindow = () => {
                     autoScroll ? null : { minIndexForVisible: 1, autoscrollToTopThreshold: 50 }
                 }
                 keyboardShouldPersistTaps="handled"
+                keyboardDismissMode="on-drag"
                 inverted
                 data={list}
                 keyExtractor={(item) => item.key}
                 renderItem={renderItems}
                 scrollEventThrottle={16}
+                onScroll={handleScroll}
                 onViewableItemsChanged={(item) => {
                     const index = item.viewableItems?.at(0)?.index
 
@@ -156,13 +179,54 @@ const ChatWindow = () => {
                     paddingTop: chatInputHeight,
                     paddingBottom: 32,
                     rowGap: 8,
+                    // Keep line lengths readable on tablets, unfolded foldables and landscape
+                    width: '100%',
+                    maxWidth: Layout.chatMaxContentWidth,
+                    alignSelf: 'center',
                 }}
                 ListFooterComponent={() => <ChatFooter />}
             />
 
             <ChatHeaderGradient />
+
+            {showJumpToLatest && (
+                <Animated.View
+                    entering={FadeIn.duration(150)}
+                    exiting={FadeOut.duration(150)}
+                    style={{
+                        position: 'absolute',
+                        alignSelf: 'center',
+                        bottom: chatInputHeight + 12,
+                    }}>
+                    <ThemedButton
+                        variant="secondary"
+                        iconName="down"
+                        iconSize={20}
+                        accessibilityLabel="Jump to latest message"
+                        buttonStyle={{
+                            borderRadius: 24,
+                            paddingVertical: 8,
+                            paddingHorizontal: 8,
+                            backgroundColor: color.neutral._100 + 'ee',
+                            boxShadow: [
+                                {
+                                    offsetX: 1,
+                                    offsetY: 1,
+                                    color: color.shadow,
+                                    spreadDistance: 1,
+                                    blurRadius: 4,
+                                },
+                            ],
+                        }}
+                        onPress={scrollToLatest}
+                    />
+                </Animated.View>
+            )}
         </ImageBackground>
     )
 }
+
+/** Scroll distance (px) from the newest message before the jump button appears */
+const JUMP_TO_LATEST_THRESHOLD = 400
 
 export default ChatWindow

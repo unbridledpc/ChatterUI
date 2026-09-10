@@ -124,10 +124,13 @@ const ThemedButton: React.FC<ThemedButtonProps> = ({
     iconSize = 20,
     iconStyle = undefined,
     icon = undefined,
+    hitSlop,
     ...rest
 }) => {
     const animOpacity = useAnimatedValue(1)
     const theme = useButtonTheme(variant)
+    // Icon-only buttons are small; widen their touch area so they are easy to hit on a phone.
+    const isIconOnly = !label && (!!iconName || !!icon)
     const handlePressIn = () => {
         animOpacity.setValue(0.4)
     }
@@ -143,6 +146,7 @@ const ThemedButton: React.FC<ThemedButtonProps> = ({
     return (
         <AnimatedPressable
             disabled={variant === 'disabled'}
+            hitSlop={hitSlop ?? (isIconOnly ? 8 : undefined)}
             onPressIn={(event) => {
                 handlePressIn()
                 if (onPressIn) onPressIn(event)
