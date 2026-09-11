@@ -18,6 +18,10 @@ export type WebToolsConfig = {
     useJinaReader: boolean
     maxResults: number
     maxPageChars: number
+    /** Attach the opening text of the top results to search output, so small models get facts without a second call */
+    searchExcerpts: boolean
+    excerptCount: number
+    excerptChars: number
     /** Upper bound on tool rounds per reply before the model must answer */
     maxRounds: number
 }
@@ -37,6 +41,9 @@ export const defaultWebToolsConfig: WebToolsConfig = {
     useJinaReader: true,
     maxResults: 4,
     maxPageChars: 6000,
+    searchExcerpts: true,
+    excerptCount: 2,
+    excerptChars: 1500,
     maxRounds: 5,
 }
 

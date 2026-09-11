@@ -104,8 +104,53 @@ const truncate = (text: string, maxChars: number) =>
 
 const isHttpUrl = (url: string) => /^https?:\/\//i.test(url)
 
-const formatResults = (results: SearchResult[]) =>
-    results.map((item, i) => `${i + 1}. ${item.title}\n${item.url}\n${item.snippet}`).join('\n\n')
+type ExcerptedResult = SearchResult & { excerpt?: string }
+
+const formatResults = (results: ExcerptedResult[]) =>
+    results
+        .map((item, i) => {
+            const lines = [`${i + 1}. ${item.title || item.url}`, item.url]
+            if (item.snippet) lines.push(item.snippet)
+            if (item.excerpt) lines.push(`Excerpt: ${item.excerpt}`)
+            return lines.join('\n')
+        })
+        .join('\n\n')
+
+const RESULTS_FOOTER =
+    'Answer using only the information above and cite the URLs you relied on. ' +
+    'If it does not contain the answer, call fetch_url on the most relevant URL before answering.'
+
+const resultsHeader = (query: string) =>
+    `Search results for "${query}", retrieved ${new Date().toDateString()}:\n\n`
+
+/** Pulls the opening text of a page through Jina Reader. Returns undefined on any failure. */
+const fetchExcerpt = async (url: string, chars: number, key: string) => {
+    try {
+        const response = await fetchWithTimeout(`https://r.jina.ai/${url}`, {
+            headers: jinaHeaders(key, { Accept: 'text/plain', 'X-Timeout': '10' }),
+        })
+        if (!response.ok) return
+        const text = (await response.text()).replace(/\s+/g, ' ').trim()
+        return text.length > chars ? text.slice(0, chars) + '…' : text
+    } catch {
+        return
+    }
+}
+
+/** Attaches excerpts to the first few results so the model has real content to read */
+const attachExcerpts = async (
+    results: SearchResult[],
+    config: WebToolsConfig
+): Promise<ExcerptedResult[]> => {
+    if (!config.searchExcerpts) return results
+    const count = Math.max(0, Math.min(config.excerptCount, results.length))
+    const excerpts = await Promise.all(
+        results
+            .slice(0, count)
+            .map((item) => fetchExcerpt(item.url, config.excerptChars, config.jinaKey))
+    )
+    return results.map((item, i) => (i < count ? { ...item, excerpt: excerpts[i] } : item))
+}
 
 /** Keyless. DuckDuckGo's HTML endpoint; may serve a bot challenge from some networks. */
 const searchDuckDuckGo = async (query: string, max: number): Promise<SearchResult[]> => {
@@ -127,11 +172,47 @@ const searchDuckDuckGo = async (query: string, max: number): Promise<SearchResul
     }
     let linkMatch: RegExpExecArray | null
     while ((linkMatch = linkPattern.exec(html)) !== null && results.length < max) {
-        let url = decodeEntities(linkMatch[1])
-        // Results are wrapped in a redirect: //duckduckgo.com/l/?uddg=<encoded url>&rut=...
-        const redirect = url.match(/[?&]uddg=([^&]+)/)
-        if (redirect) url = decodeURIComponent(redirect[1])
-        else if (url.startsWith('//')) url = 'https:' + url
+        const url = unwrapDuckDuckGoUrl(decodeEntities(linkMatch[1]))
+        if (!isHttpUrl(url)) continue
+        results.push({
+            title: stripTags(linkMatch[2]),
+            url: url,
+            snippet: (snippets[results.length] ?? '').slice(0, 400),
+        })
+    }
+    if (results.length > 0) return results
+    Logger.warn('DuckDuckGo HTML page had no parseable results, trying the lite endpoint')
+    return searchDuckDuckGoLite(query, max)
+}
+
+/** Results are wrapped in a redirect: //duckduckgo.com/l/?uddg=<encoded url>&rut=... */
+const unwrapDuckDuckGoUrl = (url: string) => {
+    const redirect = url.match(/[?&]uddg=([^&]+)/)
+    if (redirect) return decodeURIComponent(redirect[1])
+    if (url.startsWith('//')) return 'https:' + url
+    return url
+}
+
+/** DuckDuckGo's table-based lite page, with different markup from the HTML endpoint */
+const searchDuckDuckGoLite = async (query: string, max: number): Promise<SearchResult[]> => {
+    const response = await fetchWithTimeout(
+        `https://lite.duckduckgo.com/lite/?q=${encodeURIComponent(query)}&kl=us-en`,
+        { headers: { 'User-Agent': BROWSER_UA, Accept: 'text/html' } }
+    )
+    if (response.status === 202) throw new Error('DuckDuckGo served a bot challenge')
+    if (!response.ok) throw new Error(`DuckDuckGo lite returned ${response.status}`)
+    const html = await response.text()
+    const results: SearchResult[] = []
+    const linkPattern = /<a[^>]*href="([^"]+)"[^>]*class="result-link"[^>]*>([\s\S]*?)<\/a>/g
+    const snippetPattern = /class="result-snippet"[^>]*>([\s\S]*?)<\/td>/g
+    const snippets: string[] = []
+    let snippetMatch: RegExpExecArray | null
+    while ((snippetMatch = snippetPattern.exec(html)) !== null) {
+        snippets.push(stripTags(snippetMatch[1]))
+    }
+    let linkMatch: RegExpExecArray | null
+    while ((linkMatch = linkPattern.exec(html)) !== null && results.length < max) {
+        const url = unwrapDuckDuckGoUrl(decodeEntities(linkMatch[1]))
         if (!isHttpUrl(url)) continue
         results.push({
             title: stripTags(linkMatch[2]),
@@ -237,7 +318,12 @@ export const webSearch = async (query: string, config: WebToolsConfig): Promise<
     try {
         const results = await searchWithProvider(query, max, config)
         if (results.length > 0) {
-            return { output: formatResults(results), summary: `${results.length} results` }
+            const excerpted = await attachExcerpts(results, config)
+            const withExcerpts = excerpted.filter((item) => item.excerpt).length
+            return {
+                output: resultsHeader(query) + formatResults(excerpted) + '\n\n' + RESULTS_FOOTER,
+                summary: `${results.length} results${withExcerpts ? `, ${withExcerpts} excerpts` : ''}`,
+            }
         }
         primaryError = 'no results'
     } catch (e) {
@@ -252,10 +338,14 @@ export const webSearch = async (query: string, config: WebToolsConfig): Promise<
             summary: `failed: ${primaryError}`,
         }
     }
+    const excerpted = await attachExcerpts(fallback, config)
     return {
         output:
-            `Web search was unavailable (${primaryError}). Wikipedia results instead; use ${FETCH_URL_TOOL} on the most relevant page to get current details:\n\n` +
-            formatResults(fallback),
+            resultsHeader(query) +
+            `Web search was unavailable (${primaryError}). Wikipedia results instead:\n\n` +
+            formatResults(excerpted) +
+            '\n\n' +
+            RESULTS_FOOTER,
         summary: `Wikipedia fallback, ${fallback.length} results`,
     }
 }

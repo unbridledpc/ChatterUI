@@ -6,6 +6,7 @@ import {
     LlamaContext,
     RNLLAMA_MTMD_DEFAULT_MEDIA_MARKER,
 } from 'cui-llama.rn'
+import { totalMemory } from 'expo-device'
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
@@ -96,6 +97,12 @@ export type EngineDataProps = {
 }
 
 const sessionFile = `${AppDirectory.SessionPath}llama-session.bin`
+
+/**
+ * Pinning a model that takes more than this share of device RAM leaves the OS
+ * nothing to page, and Android kills the app on load. Above it, mmap alone is used.
+ */
+const MLOCK_MAX_RAM_FRACTION = 0.35
 
 const defaultConfig: LlamaConfig = {
     context_length: 8192,
@@ -222,6 +229,14 @@ export namespace Llama {
                 flashAttention = 'on'
             }
 
+            let useMlock = config.use_mlock ?? true
+            if (useMlock && totalMemory && model.file_size > totalMemory * MLOCK_MAX_RAM_FRACTION) {
+                Logger.warn(
+                    `Model is ${readableFileSize(model.file_size)} on a ${readableFileSize(totalMemory)} device, not locking it in memory to avoid being killed on load`
+                )
+                useMlock = false
+            }
+
             const params: ContextParams = {
                 model: model_path,
                 n_ctx: config.context_length,
@@ -229,7 +244,7 @@ export namespace Llama {
                 n_batch: config.batch,
                 ctx_shift: config.ctx_shift,
                 n_gpu_layers: config.gpu_layers,
-                use_mlock: config.use_mlock ?? true,
+                use_mlock: useMlock,
                 use_mmap: true,
                 devices: config.devices,
                 flash_attn_type: flashAttention,

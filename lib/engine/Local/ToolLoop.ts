@@ -133,7 +133,9 @@ export const runLocalToolLoop = async ({ payload, messages, replace }: ToolLoopP
             )
             toolLog += `> ${line} (${summary})\n`
             Chats.useChatState.getState().setBuffer({ data: toolLog })
-            Logger.info(`[Web Tools] ${summary}`)
+            Logger.info(
+                `[Web Tools] ${summary}, ${output.length} chars returned to the model:\n${output.slice(0, 800)}`
+            )
             history.push({
                 role: 'tool',
                 name: call.function.name,

@@ -87,6 +87,24 @@ const WebToolsSettings = () => {
                 onChangeValue={(value) => setConfig({ useJinaReader: value })}
             />
 
+            <ThemedSwitch
+                label="Attach Page Excerpts To Search Results"
+                description="Reads the opening text of the top results and includes it with the search output. Slower, but small models answer from real content instead of memory."
+                value={config.searchExcerpts}
+                onChangeValue={(value) => setConfig({ searchExcerpts: value })}
+            />
+
+            {config.searchExcerpts && (
+                <ThemedSlider
+                    label="Excerpt Characters"
+                    value={config.excerptChars}
+                    onValueChange={(value) => setConfig({ excerptChars: value })}
+                    min={500}
+                    max={4000}
+                    step={250}
+                />
+            )}
+
             <ThemedSlider
                 label="Search Results"
                 value={config.maxResults}
