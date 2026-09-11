@@ -32,6 +32,7 @@ import { Theme } from '@lib/theme/ThemeManager'
 import ChatContextMeter from './ChatContextMeter'
 import ChatOptions from './ChatInputOptions'
 import ThinkingToggle from './ThinkingToggle'
+import WebToolsToggle from './WebToolsToggle'
 
 export type Attachment = {
     uri: string
@@ -262,6 +263,7 @@ const ChatInput = () => {
                                 placement="top"
                             />
                             <ThinkingToggle />
+                            <WebToolsToggle />
                         </Animated.View>
                     )}
                     {hideOptions && (

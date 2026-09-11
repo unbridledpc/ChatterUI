@@ -14,6 +14,7 @@ import NotificationSettings from './NotificationSettings'
 import ScreenSettings from './ScreenSettings'
 import SecuritySettings from './SecuritySettings'
 import StyleSettings from './StyleSettings'
+import WebToolsSettings from './WebToolsSettings'
 
 const AppSettingsMenu = () => {
     const { spacing } = Theme.useTheme()
@@ -31,6 +32,7 @@ const AppSettingsMenu = () => {
             <StyleSettings />
             <ChatSettings />
             <ChatWindowSettings />
+            <WebToolsSettings />
             <CharacterSettings />
             <GeneratingSettings />
             <NotificationSettings />

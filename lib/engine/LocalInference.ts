@@ -7,6 +7,7 @@ import { commonStopStrings, Instructs, outputPrefixes } from '@lib/state/Instruc
 import { Logger } from '@lib/state/Logger'
 import { SamplersManager } from '@lib/state/SamplerState'
 import { useTTSStore } from '@lib/state/TTS'
+import { WebTools } from '@lib/state/WebTools'
 import { mmkv } from '@lib/storage/MMKV'
 import { CompletionTimings } from 'db/schema'
 
@@ -15,9 +16,11 @@ import {
     buildChatCompletionContext,
     buildTextCompletionContext,
     ContextBuilderParams,
+    Message,
 } from './API/ContextBuilder'
 import { Llama, LlamaConfig } from './Local/LlamaLocal'
 import { KV } from './Local/Model'
+import { modelSupportsTools, runLocalToolLoop } from './Local/ToolLoop'
 
 export const localSamplerData: APISampler[] = [
     { externalName: 'n_predict', samplerID: SamplerID.GENERATED_LENGTH },
@@ -94,8 +97,13 @@ const buildLocalPayload = async () => {
     const hasImage = completionType.type === 'chatCompletions' && completionType.supportsImages
     const bufferExists = !!Chats.useChatState.getState().buffer.data
 
+    // Messages kept for the tool-calling loop. Not used when continuing a reply,
+    // since the binding cannot resume a partial assistant turn through the template.
+    let toolMessages: Message[] | undefined
+
     if (mmkv.getBoolean(AppSettings.UseModelTemplate)) {
         const messages = await buildChatCompletionContext({ apiConfig, ...rest })
+        if (messages && !bufferExists) toolMessages = messages
         try {
             if (messages) {
                 const result = await Llama.useLlamaModelStore
@@ -148,13 +156,16 @@ const buildLocalPayload = async () => {
     const finalMediaPaths = hasAudio || hasImage ? { media_paths: mediaPaths } : {}
 
     return {
-        ...payloadFields,
-        penalize_nl: typeof rep_pen === 'number' && rep_pen > 1,
-        n_threads: localPreset.threads,
-        prompt: prompt ?? '',
-        stop: constructStopSequence(),
-        emit_partial_completion: true,
-        ...finalMediaPaths,
+        payload: {
+            ...payloadFields,
+            penalize_nl: typeof rep_pen === 'number' && rep_pen > 1,
+            n_threads: localPreset.threads,
+            prompt: prompt ?? '',
+            stop: constructStopSequence(),
+            emit_partial_completion: true,
+            ...finalMediaPaths,
+        },
+        toolMessages: toolMessages,
     }
 }
 
@@ -227,13 +238,14 @@ export const localInference = async () => {
             return
         }
 
-        const payload = await buildLocalPayload()
+        const built = await buildLocalPayload()
 
-        if (!payload) {
+        if (!built) {
             Logger.warnToast('Failed to build payload')
             stopGenerating()
             return
         }
+        const { payload, toolMessages } = built
 
         if (mmkv.getBoolean(AppSettings.SaveLocalKV) && !KV.useKVStore.getState().kvCacheLoaded) {
             const prompt = await Llama.useLlamaModelStore
@@ -254,7 +266,7 @@ export const localInference = async () => {
                                 if (result) {
                                     KV.useKVStore.getState().setKvCacheLoaded(true)
                                 }
-                                runLocalCompletion(payload)
+                                runLocalCompletion(payload, toolMessages)
                             },
                             type: 'warning',
                         },
@@ -269,7 +281,7 @@ export const localInference = async () => {
                 KV.useKVStore.getState().setKvCacheLoaded(true)
             }
         }
-        await runLocalCompletion(payload)
+        await runLocalCompletion(payload, toolMessages)
     } catch (e) {
         Logger.errorToast('Failed to run local inference: ' + e)
         stopGenerating()
@@ -277,7 +289,8 @@ export const localInference = async () => {
 }
 
 const runLocalCompletion = async (
-    payload: NonNullable<Awaited<ReturnType<typeof buildLocalPayload>>>
+    payload: Exclude<Awaited<ReturnType<typeof buildLocalPayload>>, void>['payload'],
+    toolMessages?: Message[]
 ) => {
     const replace = RegExp(
         constructReplaceStrings()
@@ -285,6 +298,23 @@ const runLocalCompletion = async (
             .join(`|`),
         'g'
     )
+
+    // Web tools: hand the turn to the tool-calling loop when the globe is on
+    // and the model's template can express tool calls.
+    if (WebTools.useWebToolsStore.getState().config.enabled && toolMessages) {
+        if (modelSupportsTools()) {
+            await runLocalToolLoop({
+                payload: payload,
+                messages: toolMessages,
+                replace: replace,
+            }).catch((error) => {
+                Logger.errorToast(`Failed to generate with web tools: ${error}`)
+                stopGenerating()
+            })
+            return
+        }
+        Logger.warnToast('This model has no tool support. Web tools skipped for this reply.')
+    }
 
     useInference.getState().setAbort(async () => {
         await Llama.useLlamaModelStore.getState().stopCompletion()
