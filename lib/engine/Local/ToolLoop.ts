@@ -123,10 +123,17 @@ export const runLocalToolLoop = async ({ payload, messages, replace }: ToolLoopP
 
         for (const call of calls) {
             const line = describeToolCall(call.function.name, call.function.arguments)
-            toolLog += `> ${line}\n`
-            Chats.useChatState.getState().setBuffer({ data: toolLog })
+            // Show the call right away, then append its outcome so a failed search is visible
+            Chats.useChatState.getState().setBuffer({ data: `${toolLog}> ${line}\n` })
             Logger.info(`[Web Tools] ${line}`)
-            const output = await executeWebTool(call.function.name, call.function.arguments, config)
+            const { output, summary } = await executeWebTool(
+                call.function.name,
+                call.function.arguments,
+                config
+            )
+            toolLog += `> ${line} (${summary})\n`
+            Chats.useChatState.getState().setBuffer({ data: toolLog })
+            Logger.info(`[Web Tools] ${summary}`)
             history.push({
                 role: 'tool',
                 name: call.function.name,

@@ -4,7 +4,7 @@ import { persist } from 'zustand/middleware'
 import { Storage } from '@lib/enums/Storage'
 import { createMMKVStorage } from '@lib/storage/MMKV'
 
-export type SearchProvider = 'jina' | 'searxng' | 'brave'
+export type SearchProvider = 'duckduckgo' | 'jina' | 'searxng' | 'brave'
 
 export type WebToolsConfig = {
     /** Globe button in the chat input. When on, local models may call web tools. */
@@ -30,7 +30,7 @@ type WebToolsState = {
 
 export const defaultWebToolsConfig: WebToolsConfig = {
     enabled: false,
-    provider: 'jina',
+    provider: 'duckduckgo',
     jinaKey: '',
     searxngUrl: '',
     braveKey: '',
@@ -51,9 +51,19 @@ export namespace WebTools {
             {
                 name: Storage.WebTools,
                 storage: createMMKVStorage(),
-                version: 1,
+                version: 2,
                 partialize: (state) => ({ config: state.config }),
-                migrate: (persistedState: any) => persistedState,
+                migrate: (persistedState: any, version) => {
+                    // v1 defaulted to Jina search, which now needs an API key
+                    if (
+                        version < 2 &&
+                        persistedState?.config?.provider === 'jina' &&
+                        !persistedState.config.jinaKey
+                    ) {
+                        persistedState.config.provider = 'duckduckgo'
+                    }
+                    return persistedState
+                },
             }
         )
     )

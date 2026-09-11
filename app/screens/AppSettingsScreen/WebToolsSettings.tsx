@@ -11,7 +11,8 @@ import { SearchProvider, WebTools } from '@lib/state/WebTools'
 import { Theme } from '@lib/theme/ThemeManager'
 
 const providers: { label: string; value: SearchProvider }[] = [
-    { label: 'Jina (no key)', value: 'jina' },
+    { label: 'DuckDuckGo', value: 'duckduckgo' },
+    { label: 'Jina', value: 'jina' },
     { label: 'SearXNG', value: 'searxng' },
     { label: 'Brave', value: 'brave' },
 ]
@@ -33,6 +34,7 @@ const WebToolsSettings = () => {
             <HorizontalSelector
                 style={{ flex: 0 }}
                 label="Search Provider"
+                description="DuckDuckGo needs no key. If a search fails, Wikipedia results are used instead so the model still has something real to read."
                 values={providers}
                 selected={config.provider}
                 onPress={(value) => setConfig({ provider: value })}
@@ -40,8 +42,8 @@ const WebToolsSettings = () => {
 
             {config.provider === 'jina' && (
                 <ThemedTextInput
-                    label="Jina API Key (optional)"
-                    description="Free without a key but rate limited. A key from jina.ai raises the limits."
+                    label="Jina API Key"
+                    description="Required for Jina search. Also raises the reader's rate limit."
                     containerStyle={{ flex: 0 }}
                     value={config.jinaKey}
                     onChangeText={(value) => setConfig({ jinaKey: value })}
